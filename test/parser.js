@@ -77,6 +77,19 @@ describe('parser', function () {
         expect(encode({ type: 'message', data: 'test' })).to.match(/^[0-9]/);
         expect(encode({ type: 'message' })).to.match(/^[0-9]$/);
       });
+
+      it('should encode unicode js correctly', function() {
+        expect(encode({ type: 'message', data: '\u00ad' })).to.match(/\\u00ad/);
+      });
+
+      it('should decode unicode js correctly', function() {
+        expect(decode('4ab\\u0061a').data).to.be('abaa');
+      });
+
+      it('should encode and decode unicode js correctly', function() {
+        expect(decode(encode({ type: 'message', data: '\u00ad' })).data).to.be('\u00ad');
+      });
+
     });
 
     describe('decoding error handing', function () {
