@@ -138,8 +138,8 @@ A noop packet. Used primarily to force a poll cycle when an incoming websocket c
 
 ##### example
 1. client connects through new transport
-2. client sends ```2probe```
-3. server receives and sends ```3probe```
+2. client sends ```2probe``` (ping)
+3. server receives and sends ```3``` (pong)
 4. client receives and sends ```5```
 5. server flushes and closes old transport and switches to new.
 
