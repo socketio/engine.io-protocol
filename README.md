@@ -102,11 +102,11 @@ Request the close of this transport but does not shutdown the connection itself.
 
 #### 2 ping
 
-Sent by the client. Server should answer with a pong packet containing the same data
+Sent by the client. Server should respond with packet of type 'pong'.
 
-example
-1. client sends: ```2probe```
-2. server sends: ```3probe```
+example  
+1. client sends: ```2probe```  
+2. server sends: ```3```
 
 #### 3 pong
 
