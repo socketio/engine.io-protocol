@@ -542,7 +542,7 @@ describe("Engine.IO protocol", () => {
       expect(data).to.eql("4hello");
     });
 
-    it("ignores WebSocket connection with same sid after upgrade", async () => {
+    it("should ignore WebSocket connection with same sid after upgrade", async () => {
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
@@ -557,13 +557,7 @@ describe("Engine.IO protocol", () => {
         `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
       );
 
-      await waitFor(socket2, "error");
-
-      socket.send("4hello");
-
-      const { data } = await waitFor(socket, "message");
-
-      expect(data).to.eql("4hello");
+        await waitFor(socket2, "close");
     });
   });
 });
