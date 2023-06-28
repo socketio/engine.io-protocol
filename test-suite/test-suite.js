@@ -29,9 +29,17 @@ function waitFor(socket, eventType) {
   });
 }
 
+function decodePayload(payload) {
+  const firstColonIndex = payload.indexOf(":");
+  const length = payload.substring(0, firstColonIndex);
+  const packet = payload.substring(firstColonIndex + 1);
+  return [length, packet];
+}
+
 async function initLongPollingSession() {
-  const response = await fetch(`${URL}/engine.io/?EIO=4&transport=polling`);
-  const content = await response.text();
+  const response = await fetch(`${URL}/engine.io/?EIO=3&transport=polling`);
+  const text = await response.text();
+  const [, content] = decodePayload(text);
   return JSON.parse(content.substring(1)).sid;
 }
 
@@ -40,13 +48,15 @@ describe("Engine.IO protocol", () => {
     describe("HTTP long-polling", () => {
       it("successfully opens a session", async () => {
         const response = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling`
+          `${URL}/engine.io/?EIO=3&transport=polling`
         );
 
         expect(response.status).to.eql(200);
 
-        const content = await response.text();
+        const text = await response.text();
+        const [length, content] = decodePayload(text);
 
+        expect(length).to.eql(content.length.toString());
         expect(content).to.startsWith("0");
 
         const value = JSON.parse(content.substring(1));
@@ -78,18 +88,18 @@ describe("Engine.IO protocol", () => {
       });
 
       it("fails with an invalid 'transport' query parameter", async () => {
-        const response = await fetch(`${URL}/engine.io/?EIO=4`);
+        const response = await fetch(`${URL}/engine.io/?EIO=3`);
 
         expect(response.status).to.eql(400);
 
-        const response2 = await fetch(`${URL}/engine.io/?EIO=4&transport=abc`);
+        const response2 = await fetch(`${URL}/engine.io/?EIO=3&transport=abc`);
 
         expect(response2.status).to.eql(400);
       });
 
       it("fails with an invalid request method", async () => {
         const response = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling`,
+          `${URL}/engine.io/?EIO=3&transport=polling`,
           {
             method: "post",
           }
@@ -98,7 +108,7 @@ describe("Engine.IO protocol", () => {
         expect(response.status).to.eql(400);
 
         const response2 = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling`,
+          `${URL}/engine.io/?EIO=3&transport=polling`,
           {
             method: "put",
           }
@@ -111,7 +121,7 @@ describe("Engine.IO protocol", () => {
     describe("WebSocket", () => {
       it("successfully opens a session", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
         const { data } = await waitFor(socket, "message");
@@ -159,7 +169,7 @@ describe("Engine.IO protocol", () => {
       });
 
       it("fails with an invalid 'transport' query parameter", async () => {
-        const socket = new WebSocket(`${WS_URL}/engine.io/?EIO=4`);
+        const socket = new WebSocket(`${WS_URL}/engine.io/?EIO=3`);
 
         if (isNodejs) {
           socket.on("error", () => {});
@@ -168,7 +178,7 @@ describe("Engine.IO protocol", () => {
         waitFor(socket, "close");
 
         const socket2 = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=abc`
+          `${WS_URL}/engine.io/?EIO=3&transport=abc`
         );
 
         if (isNodejs) {
@@ -186,10 +196,10 @@ describe("Engine.IO protocol", () => {
         const sid = await initLongPollingSession();
 
         const pushResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`,
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
           {
             method: "post",
-            body: "4hello",
+            body: "6:4hello",
           }
         );
 
@@ -200,24 +210,24 @@ describe("Engine.IO protocol", () => {
         expect(postContent).to.eql("ok");
 
         const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse.status).to.eql(200);
 
         const pollContent = await pollResponse.text();
 
-        expect(pollContent).to.eql("4hello");
+        expect(pollContent).to.eql("6:4hello");
       });
 
       it("sends and receives a payload containing several plain text packets", async () => {
         const sid = await initLongPollingSession();
 
         const pushResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`,
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
           {
             method: "post",
-            body: "4test1\x1e4test2\x1e4test3",
+            body: "6:4test16:4test26:4test3",
           }
         );
 
@@ -228,24 +238,24 @@ describe("Engine.IO protocol", () => {
         expect(postContent).to.eql("ok");
 
         const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse.status).to.eql(200);
 
         const pollContent = await pollResponse.text();
 
-        expect(pollContent).to.eql("4test1\x1e4test2\x1e4test3");
+        expect(pollContent).to.eql("6:4test16:4test26:4test3");
       });
 
       it("sends and receives a payload containing plain text and binary packets", async () => {
         const sid = await initLongPollingSession();
 
         const pushResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`,
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
           {
             method: "post",
-            body: "4hello\x1ebAQIDBA==",
+            body: "6:4hello9:bAQIDBA==",
           }
         );
 
@@ -256,22 +266,24 @@ describe("Engine.IO protocol", () => {
         expect(postContent).to.eql("ok");
 
         const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse.status).to.eql(200);
 
         const pollContent = await pollResponse.text();
 
-        expect(pollContent).to.eql("4hello\x1ebAQIDBA==");
+        expect(pollContent).to.eql("6:4hello9:bAQIDBA==");
       });
+
+      // TODO: add test for binary (i.e. not base64 encoded) packets
 
       it("closes the session upon invalid packet format", async () => {
         const sid = await initLongPollingSession();
 
         try {
           const pushResponse = await fetch(
-            `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`,
+            `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
             {
               method: "post",
               body: "abc",
@@ -284,7 +296,7 @@ describe("Engine.IO protocol", () => {
         }
 
         const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse.status).to.eql(400);
@@ -294,21 +306,21 @@ describe("Engine.IO protocol", () => {
         const sid = await initLongPollingSession();
 
         const pollResponses = await Promise.all([
-          fetch(`${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`),
-          sleep(5).then(() => fetch(`${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}&t=burst`)),
+          fetch(`${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`),
+          sleep(5).then(() => fetch(`${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}&t=burst`)),
         ]);
 
         expect(pollResponses[0].status).to.eql(200);
 
         const content = await pollResponses[0].text();
 
-        expect(content).to.eql("1");
+        expect(content).to.eql("1:1");
 
         // the Node.js implementation uses HTTP 500 (Internal Server Error), but HTTP 400 seems more suitable
         expect(pollResponses[1].status).to.be.oneOf([400, 500]);
 
         const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse.status).to.eql(400);
@@ -318,7 +330,7 @@ describe("Engine.IO protocol", () => {
     describe("WebSocket", () => {
       it("sends and receives a plain text packet", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
         await waitFor(socket, "open");
@@ -336,7 +348,7 @@ describe("Engine.IO protocol", () => {
 
       it("sends and receives a binary packet", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
         socket.binaryType = "arraybuffer";
 
@@ -353,7 +365,7 @@ describe("Engine.IO protocol", () => {
 
       it("closes the session upon invalid packet format", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
         await waitFor(socket, "message"); // handshake
@@ -375,63 +387,69 @@ describe("Engine.IO protocol", () => {
         const sid = await initLongPollingSession();
 
         for (let i = 0; i < 3; i++) {
+          const pushResponse = await fetch(
+            `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
+            {
+              method: "post",
+              body: "1:2",
+            }
+          );
+
+          expect(pushResponse.status).to.eql(200);
+
           const pollResponse = await fetch(
-            `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+            `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
           );
 
           expect(pollResponse.status).to.eql(200);
 
           const pollContent = await pollResponse.text();
 
-          expect(pollContent).to.eql("2");
-
-          const pushResponse = await fetch(
-            `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`,
-            {
-              method: "post",
-              body: "3",
-            }
-          );
-
-          expect(pushResponse.status).to.eql(200);
+          expect(pollContent).to.eql("1:3");
         }
       });
 
       it("closes the session upon ping timeout", async () => {
+        // TODO: update this test; is it valid for v3?
         const sid = await initLongPollingSession();
 
         await sleep(PING_INTERVAL + PING_TIMEOUT);
 
-        const pollResponse = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+        const pushResponse = await fetch(
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
+          {
+            method: "post",
+            body: "1:2",
+          }
         );
 
-        expect(pollResponse.status).to.eql(400);
+        expect(pushResponse.status).to.eql(400);
       });
     });
 
     describe("WebSocket", () => {
       it("sends ping/pong packets", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
-        await waitFor(socket, "message"); // handshake
+        const x = await waitFor(socket, "message"); // handshake
 
         for (let i = 0; i < 3; i++) {
+          socket.send("2");
+
           const { data } = await waitFor(socket, "message");
 
-          expect(data).to.eql("2");
-
-          socket.send("3");
+          expect(data).to.eql("3");
         }
 
         socket.close();
       });
 
       it("closes the session upon ping timeout", async () => {
+        // TODO: update this test; is it valid for v3?
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
         await waitFor(socket, "close"); // handshake
@@ -445,10 +463,10 @@ describe("Engine.IO protocol", () => {
         const sid = await initLongPollingSession();
 
         const [pollResponse] = await Promise.all([
-          fetch(`${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`),
-          fetch(`${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`, {
+          fetch(`${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`),
+          fetch(`${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`, {
             method: "post",
-            body: "1",
+            body: "1:1",
           }),
         ]);
 
@@ -456,10 +474,10 @@ describe("Engine.IO protocol", () => {
 
         const pullContent = await pollResponse.text();
 
-        expect(pullContent).to.eql("6");
+        expect(pullContent).to.eql("1:6");
 
         const pollResponse2 = await fetch(
-          `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+          `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
         );
 
         expect(pollResponse2.status).to.eql(400);
@@ -469,7 +487,7 @@ describe("Engine.IO protocol", () => {
     describe("WebSocket", () => {
       it("forcefully closes the session", async () => {
         const socket = new WebSocket(
-          `${WS_URL}/engine.io/?EIO=4&transport=websocket`
+          `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
 
         await waitFor(socket, "message"); // handshake
@@ -486,7 +504,7 @@ describe("Engine.IO protocol", () => {
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
-        `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
+        `${WS_URL}/engine.io/?EIO=3&transport=websocket&sid=${sid}`
       );
 
       await waitFor(socket, "open");
@@ -499,14 +517,14 @@ describe("Engine.IO protocol", () => {
       expect(probeResponse.data).to.eql("3probe");
 
       const pollResponse = await fetch(
-        `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+        `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
       );
 
       expect(pollResponse.status).to.eql(200);
 
       const pollContent = await pollResponse.text();
 
-      expect(pollContent).to.eql("6"); // "noop" packet to cleanly end the HTTP long-polling request
+      expect(pollContent).to.eql("1:6"); // "noop" packet to cleanly end the HTTP long-polling request
 
       // complete upgrade
       socket.send("5");
@@ -519,10 +537,11 @@ describe("Engine.IO protocol", () => {
     });
 
     it("ignores HTTP requests with same sid after upgrade", async () => {
+      // TODO: update this test; is it valid for v3?
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
-        `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
+        `${WS_URL}/engine.io/?EIO=3&transport=websocket&sid=${sid}`
       );
 
       await waitFor(socket, "open");
@@ -530,7 +549,7 @@ describe("Engine.IO protocol", () => {
       socket.send("5");
 
       const pollResponse = await fetch(
-        `${URL}/engine.io/?EIO=4&transport=polling&sid=${sid}`
+        `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
       );
 
       expect(pollResponse.status).to.eql(400);
@@ -543,10 +562,11 @@ describe("Engine.IO protocol", () => {
     });
 
     it("ignores WebSocket connection with same sid after upgrade", async () => {
+      // TODO: update this test; is it valid for v3?
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
-        `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
+        `${WS_URL}/engine.io/?EIO=3&transport=websocket&sid=${sid}`
       );
 
       await waitFor(socket, "open");
@@ -554,7 +574,7 @@ describe("Engine.IO protocol", () => {
       socket.send("5");
 
       const socket2 = new WebSocket(
-        `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
+        `${WS_URL}/engine.io/?EIO=3&transport=websocket&sid=${sid}`
       );
 
       await waitFor(socket2, "error");
