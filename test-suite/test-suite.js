@@ -410,7 +410,6 @@ describe("Engine.IO protocol", () => {
       });
 
       it("closes the session upon ping timeout", async () => {
-        // TODO: update this test; is it valid for v3?
         const sid = await initLongPollingSession();
 
         await sleep(PING_INTERVAL + PING_TIMEOUT);
@@ -447,7 +446,6 @@ describe("Engine.IO protocol", () => {
       });
 
       it("closes the session upon ping timeout", async () => {
-        // TODO: update this test; is it valid for v3?
         const socket = new WebSocket(
           `${WS_URL}/engine.io/?EIO=3&transport=websocket`
         );
@@ -537,7 +535,6 @@ describe("Engine.IO protocol", () => {
     });
 
     it("ignores HTTP requests with same sid after upgrade", async () => {
-      // TODO: update this test; is it valid for v3?
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
@@ -545,8 +542,15 @@ describe("Engine.IO protocol", () => {
       );
 
       await waitFor(socket, "open");
+      
       socket.send("2probe");
+      let res = await waitFor(socket, "message");
+      expect(res.data).to.eql("3probe");
+      
       socket.send("5");
+
+      res = await waitFor(socket, "message");
+      expect(res.data).to.eql("6");
 
       const pollResponse = await fetch(
         `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`
@@ -562,7 +566,6 @@ describe("Engine.IO protocol", () => {
     });
 
     it("ignores WebSocket connection with same sid after upgrade", async () => {
-      // TODO: update this test; is it valid for v3?
       const sid = await initLongPollingSession();
 
       const socket = new WebSocket(
@@ -570,15 +573,22 @@ describe("Engine.IO protocol", () => {
       );
 
       await waitFor(socket, "open");
-      socket.send("2probe");
-      socket.send("5");
 
+      socket.send("2probe");
+      let res = await waitFor(socket, "message");
+      expect(res.data).to.eql("3probe");
+      
+      socket.send("5");
+      
+      res = await waitFor(socket, "message");
+      expect(res.data).to.eql("6");
+      
       const socket2 = new WebSocket(
         `${WS_URL}/engine.io/?EIO=3&transport=websocket&sid=${sid}`
       );
 
-      await waitFor(socket2, "error");
-
+      await waitFor(socket2, "close");
+        
       socket.send("4hello");
 
       const { data } = await waitFor(socket, "message");
