@@ -255,7 +255,7 @@ describe("Engine.IO protocol", () => {
           `${URL}/engine.io/?EIO=3&transport=polling&sid=${sid}`,
           {
             method: "post",
-            body: "6:4hello9:bAQIDBA==",
+            body: "6:4hello10:b4AQIDBA==",
           }
         );
 
@@ -273,7 +273,7 @@ describe("Engine.IO protocol", () => {
 
         const pollContent = await pollResponse.text();
 
-        expect(pollContent).to.eql("6:4hello9:bAQIDBA==");
+        expect(pollContent).to.eql("6:4hello10:b4AQIDBA==");
       });
 
       // TODO: add test for binary (i.e. not base64 encoded) packets
