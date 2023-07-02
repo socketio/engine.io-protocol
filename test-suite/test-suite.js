@@ -550,14 +550,27 @@ describe("Engine.IO protocol", () => {
       );
 
       await waitFor(socket, "open");
+
       socket.send("2probe");
+      let res = await waitFor(socket, "message");
+      expect(res.data).to.eql("3probe");
+
       socket.send("5");
+
+      res = await waitFor(socket, "message");
+      expect(res.data).to.eql("6");
 
       const socket2 = new WebSocket(
         `${WS_URL}/engine.io/?EIO=4&transport=websocket&sid=${sid}`
       );
 
-        await waitFor(socket2, "close");
+      await waitFor(socket2, "close");
+
+      socket.send("4hello");
+
+      const { data } = await waitFor(socket, "message");
+
+      expect(data).to.eql("4hello");
     });
   });
 });
