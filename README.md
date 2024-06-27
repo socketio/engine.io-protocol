@@ -364,7 +364,7 @@ Please note that we are not counting bytes, but characters, hence 2 (1 + 1) inst
 is encoded to:
 
 ```
-buffer <00 04 ff 34 e2 82 ac 01 04 ff 01 02 03 04>
+buffer <00 04 ff 34 e2 82 ac 01 05 ff 04 01 02 03 04>
 
 with:
 
@@ -374,8 +374,9 @@ ff              => separator
 34              => "message" packet type ("4")
 e2 82 ac        => "€"
 01              => binary header
-04              => buffer length in bytes
+05              => buffer length in bytes
 ff              => separator
+04              => "message" packet type (4)
 01 02 03 04     => buffer content
 ```
 
